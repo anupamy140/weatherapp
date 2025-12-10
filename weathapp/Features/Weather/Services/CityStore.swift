@@ -16,7 +16,6 @@ final class CityStore {
 
     // MARK: - Helpers
 
-    /// Returns the cities collection for the current logged-in user.
     private func citiesCollection() throws -> CollectionReference {
         guard let uid = Auth.auth().currentUser?.uid else {
             throw CityStoreError.noUser
@@ -27,7 +26,6 @@ final class CityStore {
             .collection("cities")
     }
 
-    /// Encodes a City to a [String: Any] dictionary suitable for Firestore.
     private func encode(_ city: City) throws -> [String: Any] {
         let data = try JSONEncoder().encode(city)
         guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -36,7 +34,6 @@ final class CityStore {
         return dict
     }
 
-    /// Decodes a City from Firestore document data.
     private func decodeCity(from dict: [String: Any]) throws -> City {
         let data = try JSONSerialization.data(withJSONObject: dict)
         let city = try JSONDecoder().decode(City.self, from: data)
@@ -45,7 +42,6 @@ final class CityStore {
 
     // MARK: - Public API
 
-    /// Fetch all cities for the current user.
     func fetchCities(completion: @escaping (Result<[City], Error>) -> Void) {
         do {
             let col = try citiesCollection()
@@ -86,7 +82,13 @@ final class CityStore {
             return
         }
 
-        let city = City(name: cleanName, lastWeather: nil, lastUpdated: nil)
+        // ✅ UPDATED: Initialize with dateAdded
+        let city = City(
+            name: cleanName,
+            lastWeather: nil,
+            lastUpdated: nil,
+            dateAdded: Date()
+        )
         saveCity(city, completion: completion)
     }
 
@@ -124,7 +126,13 @@ final class CityStore {
                     return
                 }
 
-                var city = City(name: name, lastWeather: weather, lastUpdated: Date())
+                // ✅ UPDATED: Include dateAdded for the fallback "new city" case
+                var city = City(
+                    name: name,
+                    lastWeather: weather,
+                    lastUpdated: Date(),
+                    dateAdded: Date()
+                )
 
                 if let data = snapshot?.data() {
                     // Try to merge with existing city
@@ -132,6 +140,7 @@ final class CityStore {
                         var existing = try self.decodeCity(from: data)
                         existing.lastWeather = weather
                         existing.lastUpdated = Date()
+                        // existing.dateAdded is automatically preserved
                         city = existing
                     } catch {
                         print("⚠️ Failed to decode existing city, overwriting:", error)
@@ -145,7 +154,6 @@ final class CityStore {
         }
     }
 
-    /// Delete a city document by its id (lowercased name).
     func deleteCity(id: String, completion: ((Error?) -> Void)? = nil) {
         do {
             let col = try citiesCollection()

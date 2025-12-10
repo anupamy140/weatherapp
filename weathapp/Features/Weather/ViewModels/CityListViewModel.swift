@@ -1,4 +1,3 @@
-// CityListViewModel.swift
 import Foundation
 import Combine
 import SwiftUI   // needed for remove(atOffsets:)
@@ -30,9 +29,12 @@ final class CityListViewModel: ObservableObject {
 
                 switch result {
                 case .success(let cities):
+                    // ✅ UPDATED: Sort by dateAdded.
+                    // Cities with nil dateAdded (old ones) go to the top (.distantPast).
                     self.cities = cities.sorted {
-                        $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                        ($0.dateAdded ?? .distantPast) < ($1.dateAdded ?? .distantPast)
                     }
+                    
                 case .failure(let error):
                     self.errorMessage = error.localizedDescription
                 }
@@ -59,7 +61,7 @@ final class CityListViewModel: ObservableObject {
             }
         }
     }
-
+    
     /// Refresh weather for *all* cities using the API, and save back to Firestore.
     func refreshAllWeather() async {
         guard !cities.isEmpty else { return }
@@ -80,6 +82,7 @@ final class CityListViewModel: ObservableObject {
                 var updated = city
                 updated.lastWeather = weather
                 updated.lastUpdated = Date()
+                // updated.dateAdded is preserved automatically since 'updated' is a copy
                 updatedCities.append(updated)
 
                 // 3️⃣ Save to Firestore (no need to wait)
@@ -98,9 +101,57 @@ final class CityListViewModel: ObservableObject {
         }
 
         // 4️⃣ Update UI with refreshed list
+        // ✅ UPDATED: Maintain the Date-based sort order
         cities = updatedCities.sorted {
-            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            ($0.dateAdded ?? .distantPast) < ($1.dateAdded ?? .distantPast)
         }
+        
         isLoading = false
+    }
+
+    /// Add a new city (with immediate weather fetch).
+    func addCity(named name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        isLoading = true
+        errorMessage = nil
+
+        Task {
+            do {
+                // 1. Fetch the API data first
+                let weather = try await weatherAPI.fetchWeatherAsync(for: trimmed)
+                
+                // 2. Create the City object with the fetched weather
+                // ✅ UPDATED: We set dateAdded: Date() so it sorts to the bottom
+                let newCity = City(
+                    name: trimmed,
+                    lastWeather: weather,
+                    lastUpdated: Date(),
+                    dateAdded: Date()
+                )
+
+                // 3. Save to Firestore
+                store.saveCity(newCity) { [weak self] error in
+                    DispatchQueue.main.async {
+                        guard let self = self else { return }
+                        self.isLoading = false
+
+                        if let error = error {
+                            self.errorMessage = error.localizedDescription
+                            return
+                        }
+
+                        // 4. Reload to show the new city (sorted correctly)
+                        self.loadCities()
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoading = false
+                    self.errorMessage = "Could not fetch weather for \(trimmed): \(error.localizedDescription)"
+                }
+            }
+        }
     }
 }

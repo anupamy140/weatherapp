@@ -1,10 +1,10 @@
-// weathappApp.swift
 import SwiftUI
 import FirebaseCore
+import FirebaseAuth
 
 @main
-struct weathappApp: App {
-    @StateObject private var auth = AuthViewModel()
+struct WeatherApp: App {
+    @StateObject private var authViewModel = AuthViewModel()
 
     init() {
         FirebaseApp.configure()
@@ -13,7 +13,7 @@ struct weathappApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environmentObject(auth)
+                .environmentObject(authViewModel)
         }
     }
 }

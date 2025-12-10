@@ -1,4 +1,3 @@
-// CityListView.swift
 import SwiftUI
 
 struct CityListView: View {
@@ -8,6 +7,9 @@ struct CityListView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var showAddCity = false
+
+    // Location manager for "Use my location"
+    @StateObject private var locationManager = LocationManager()
 
     var body: some View {
         ZStack {
@@ -43,9 +45,11 @@ struct CityListView: View {
                         Text("No cities yet")
                             .font(.headline)
                             .foregroundColor(.white)
-                        Text("Tap + to add your first city.")
+                        Text("Tap + or use your location to add your first city.")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.9))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -77,8 +81,8 @@ struct CityListView: View {
         .refreshable {
             await viewModel.refreshAllWeather()
         }
+        // Add City sheet – AddCitySearchView does saving & dismissing itself
         .sheet(isPresented: $showAddCity, onDismiss: {
-            // Reload list after adding a new city
             viewModel.loadCities()
         }) {
             NavigationStack {
@@ -93,12 +97,24 @@ struct CityListView: View {
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
+        // When LocationManager finds a city name, add it
+        .onChange(of: locationManager.currentCityName) { newCity in
+            guard let city = newCity else { return }
+            viewModel.addCity(named: city)
+        }
+        .onChange(of: locationManager.lastErrorMessage) { message in
+            if let msg = message {
+                viewModel.errorMessage = msg
+            }
+        }
+
     }
 
     // MARK: - Header
 
     private var headerBar: some View {
         HStack {
+            // Back button
             Button {
                 dismiss()
             } label: {
@@ -117,14 +133,38 @@ struct CityListView: View {
 
             Spacer()
 
-            Button {
-                showAddCity = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.blue)
+            HStack(spacing: 8) {
+                // 👉 Use my location button with loader
+                Button {
+                    locationManager.requestCurrentCity()
+                } label: {
+                    Group {
+                        if locationManager.isRequestingLocation {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .tint(.blue)
+                                .frame(width: 18, height: 18)
+                        } else {
+                            Image(systemName: "location.fill")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.blue)
+                        }
+                    }
                     .padding(10)
                     .background(Circle().fill(Color.white))
+                }
+                .disabled(locationManager.isRequestingLocation)
+
+                // Add city manually
+                Button {
+                    showAddCity = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.blue)
+                        .padding(10)
+                        .background(Circle().fill(Color.white))
+                }
             }
         }
         .padding(.top, 8)

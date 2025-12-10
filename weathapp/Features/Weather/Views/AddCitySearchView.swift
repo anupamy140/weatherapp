@@ -164,10 +164,12 @@ struct AddCitySearchView: View {
                 let weather = try await weatherAPI.fetchWeatherAsync(for: cityName)
 
                 // 2️⃣ Build City with weather + lastUpdated
+                // 🚀 UPDATED: Added dateAdded: Date() so it sorts correctly
                 let newCity = City(
                     name: cityName,
                     lastWeather: weather,
-                    lastUpdated: Date()
+                    lastUpdated: Date(),
+                    dateAdded: Date()
                 )
 
                 // 3️⃣ Save to Firestore via CityStore

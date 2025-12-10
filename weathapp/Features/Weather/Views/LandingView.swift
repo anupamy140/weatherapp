@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct LandingView: View {
+    /// RootView tells us what to do when the user taps "Get Started"
+    let onGetStarted: () -> Void
+
     var body: some View {
         ZStack {
             LinearGradient(
@@ -40,7 +43,10 @@ struct LandingView: View {
 
                 Spacer()
 
-                NavigationLink(destination: CityListView()) {
+                // ⬇️ Button instead of NavigationLink
+                Button {
+                    onGetStarted()
+                } label: {
                     HStack(spacing: 8) {
                         Text("Get Started")
                             .font(.headline)
@@ -59,6 +65,8 @@ struct LandingView: View {
             }
         }
     }
+
+    // MARK: - Feature card
 
     private var featureCard: some View {
         VStack(alignment: .leading, spacing: 16) {
